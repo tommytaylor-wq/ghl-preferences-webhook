@@ -77,39 +77,6 @@ app.post('/update-preferences', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
-  if (!email) {
-    return res.status(400).json({ error: 'Missing email address.' });
-  }
-
-  const selectedTags = Object.keys(rawPrefs).filter(key => rawPrefs[key] === 'on');
-  console.log("✅ Selected tags:", selectedTags);
-
-  try {
-    // TEMP: Hardcoded contact ID for safe testing
-    const contactId = '7x5qMXBGx6RJDdZ3AFo1'; // << your real contact ID
-    console.log(`👤 [TEMP] Using hardcoded contact ID: ${contactId}`);
-
-    // Step 2: Remove all preference tags
-    for (const tag of ALL_TAGS) {
-      console.log(`🧹 Removing tag: ${tag}`);
-      await axios.delete(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {
-        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch(() => {}); // Ignore if not present
-    }
-
-    // Step 3: Add valid selected tags
-    const validTags = selectedTags.filter(tag => ALL_TAGS.includes(tag));
-    if (validTags.length > 0) {
-      console.log("➕ Adding tags:", validTags);
-      await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
-        tags: validTags
-      }, {
-        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      });
-    }
-
-    console.log("✅ Preferences updated successfully.");
     return res.json({ success: true });
 
   } catch (error) {
