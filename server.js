@@ -30,7 +30,9 @@ const ALL_TAGS = [
 ];
 
 app.post('/update-preferences', async (req, res) => {
-  const { email, ...rawPrefs } = req.body;
+  const { email, cid, ...rawPrefs } = req.body;
+const contactId = cid;
+
   console.log("📩 Incoming form data:", JSON.stringify(req.body, null, 2));
 
   if (!email) {
