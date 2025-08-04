@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Allow POSTs from your website
+// Allow POSTs from your site
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -16,11 +16,11 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Secure API key from environment variable
+// GHL API Settings
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Tags this system manages
+// Tags you manage with this form
 const ALL_TAGS = [
   'wants_service_notifications',
   'wants_promotions',
@@ -31,18 +31,18 @@ const ALL_TAGS = [
 
 app.post('/update-preferences', async (req, res) => {
   const { email, ...rawPrefs } = req.body;
-
-  console.log("Incoming form data:", JSON.stringify(req.body, null, 2));
+  console.log("📩 Incoming form data:", JSON.stringify(req.body, null, 2));
 
   if (!email) {
     return res.status(400).json({ error: 'Missing email address.' });
   }
 
-  // Convert form checkbox fields into selected tags
   const selectedTags = Object.keys(rawPrefs).filter(key => rawPrefs[key] === 'on');
+  console.log("✅ Selected tags:", selectedTags);
 
   try {
-    // Step 1: Look up contact by email
+    // Step 1: Look up the contact by email
+    console.log("🔍 Looking up contact by email...");
     const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` },
       params: { email }
@@ -50,35 +50,40 @@ app.post('/update-preferences', async (req, res) => {
 
     const contact = contactRes.data.contacts?.[0];
     if (!contact || !contact.id) {
+      console.error("❌ Contact not found in GHL.");
       return res.status(404).json({ error: 'The contact id is invalid.' });
     }
 
     const contactId = contact.id;
+    console.log(`👤 Found contact ID: ${contactId}`);
 
-    // Step 2: Remove all possible tags
+    // Step 2: Remove all known preference tags
     for (const tag of ALL_TAGS) {
+      console.log(`🧹 Removing tag: ${tag}`);
       await axios.delete(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch(() => {}); // Ignore if tag wasn't present
+      }).catch(() => {}); // Ignore if it didn’t exist
     }
 
-    // Step 3: Add selected tags using correct endpoint
+    // Step 3: Add selected tags
     for (const tag of selectedTags) {
       if (ALL_TAGS.includes(tag)) {
+        console.log(`➕ Adding tag: ${tag}`);
         await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {}, {
           headers: { Authorization: `Bearer ${GHL_API_KEY}` }
         });
       }
     }
 
+    console.log("✅ Preferences updated successfully.");
     return res.json({ success: true });
 
   } catch (error) {
-    console.error('Error updating preferences:', error?.response?.data || error.message);
+    console.error('💥 Error updating preferences:', error?.response?.data || error.message);
     return res.status(500).json({ error: 'Failed to update preferences.' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
