@@ -1,11 +1,20 @@
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
+const cors = require('cors');
+
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+app.use(cors({
+  origin: 'https://tcdogwaste.com',
+  methods: ['POST'],
+  credentials: false
+}));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
 
 // GHL API settings
 const GHL_API_KEY = 'YOUR_GHL_API_KEY'; // replace with actual key
