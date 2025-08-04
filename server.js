@@ -66,14 +66,17 @@ app.post('/update-preferences', async (req, res) => {
     }
 
     // Step 3: Add selected tags
-    for (const tag of selectedTags) {
-      if (ALL_TAGS.includes(tag)) {
-        console.log(`➕ Adding tag: ${tag}`);
-        await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {}, {
-          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-        });
-      }
-    }
+    const validTags = selectedTags.filter(tag => ALL_TAGS.includes(tag));
+
+if (validTags.length > 0) {
+  console.log("➕ Adding tags:", validTags);
+  await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
+    tags: validTags
+  }, {
+    headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+  });
+}
+
 
     console.log("✅ Preferences updated successfully.");
     return res.json({ success: true });
