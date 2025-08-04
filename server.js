@@ -43,7 +43,7 @@ app.post('/update-preferences', async (req, res) => {
   console.log("✅ Selected tags:", selectedTags);
 
   try {
-    // Step 1: Get the current tags on the contact
+    // Step 1: Get current tags on contact
     const existingRes = await axios.get(`${GHL_API_BASE}/contacts/${contactId}`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` }
     });
@@ -51,14 +51,14 @@ app.post('/update-preferences', async (req, res) => {
     const existingTags = existingRes.data.tags || [];
     console.log("📎 Current tags on contact:", existingTags);
 
-    // Step 2: Remove only managed tags, keep others
+    // Step 2: Keep only tags we don't manage
     const nonPreferenceTags = existingTags.filter(tag => !ALL_TAGS.includes(tag));
     const validNewTags = selectedTags.filter(tag => ALL_TAGS.includes(tag));
     const finalTags = [...new Set([...nonPreferenceTags, ...validNewTags])];
 
     console.log("🔁 Final tags to apply:", finalTags);
 
-    // Step 3: Overwrite all tags with new combined set
+    // Step 3: Overwrite all tags with updated list
     await axios.put(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
       tags: finalTags
     }, {
@@ -66,17 +66,6 @@ app.post('/update-preferences', async (req, res) => {
     });
 
     console.log("✅ Preferences updated successfully.");
-    return res.json({ success: true });
-
-  } catch (error) {
-    console.error('💥 Error updating preferences:', error?.response?.data || error.message);
-    return res.status(500).json({ error: 'Failed to update preferences.' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
     return res.json({ success: true });
 
   } catch (error) {
