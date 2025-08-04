@@ -42,7 +42,7 @@ app.post('/update-preferences', async (req, res) => {
 
   try {
     // TEMP: Hardcoded contact ID for safe testing
-    const contactId = 'Moz8op9wQvT8GnSMhHDd'; // << your real contact ID
+    const contactId = '7x5qMXBGx6RJDdZ3AFo1'; // << your real contact ID
     console.log(`👤 [TEMP] Using hardcoded contact ID: ${contactId}`);
 
     // Step 2: Remove all preference tags
