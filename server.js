@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Allow your domain to post
+// Allow POSTs from your website
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -16,11 +16,11 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// GHL API settings
+// Secure API key from environment variable
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Tags we're managing
+// Tags this system manages
 const ALL_TAGS = [
   'wants_service_notifications',
   'wants_promotions',
@@ -38,11 +38,11 @@ app.post('/update-preferences', async (req, res) => {
     return res.status(400).json({ error: 'Missing email address.' });
   }
 
-  // Convert checkbox fields to selected tags
+  // Convert form checkbox fields into selected tags
   const selectedTags = Object.keys(rawPrefs).filter(key => rawPrefs[key] === 'on');
 
   try {
-    // Step 1: Look up the contact by email
+    // Step 1: Look up contact by email
     const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` },
       params: { email }
@@ -55,19 +55,17 @@ app.post('/update-preferences', async (req, res) => {
 
     const contactId = contact.id;
 
-    // Step 2: Remove all known preference tags
+    // Step 2: Remove all possible tags
     for (const tag of ALL_TAGS) {
       await axios.delete(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch(() => {}); // Ignore if tag didn't exist
+      }).catch(() => {}); // Ignore if tag wasn't present
     }
 
-    // Step 3: Add selected tags
+    // Step 3: Add selected tags using correct endpoint
     for (const tag of selectedTags) {
       if (ALL_TAGS.includes(tag)) {
-        await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
-          tags: [tag]
-        }, {
+        await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {}, {
           headers: { Authorization: `Bearer ${GHL_API_KEY}` }
         });
       }
