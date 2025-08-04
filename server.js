@@ -6,6 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Allow your domain to post
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -15,9 +16,8 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-
 // GHL API settings
-const GHL_API_KEY = 'YOUR_GHL_API_KEY'; // replace with actual key
+const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
 // Tags we're managing
@@ -30,7 +30,7 @@ const ALL_TAGS = [
 ];
 
 app.post('/update-preferences', async (req, res) => {
-  const { email, preferences = [] } = req.body;
+  const { email, ...rawPrefs } = req.body;
 
   console.log("Incoming form data:", JSON.stringify(req.body, null, 2));
 
@@ -38,8 +38,11 @@ app.post('/update-preferences', async (req, res) => {
     return res.status(400).json({ error: 'Missing email address.' });
   }
 
+  // Convert checkbox fields to selected tags
+  const selectedTags = Object.keys(rawPrefs).filter(key => rawPrefs[key] === 'on');
+
   try {
-    // Step 1: Look up the contact in GHL
+    // Step 1: Look up the contact by email
     const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` },
       params: { email }
@@ -52,15 +55,15 @@ app.post('/update-preferences', async (req, res) => {
 
     const contactId = contact.id;
 
-    // Step 2: Remove all existing preference tags
+    // Step 2: Remove all known preference tags
     for (const tag of ALL_TAGS) {
       await axios.delete(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch(() => {}); // Ignore if tag wasn't there
+      }).catch(() => {}); // Ignore if tag didn't exist
     }
 
-    // Step 3: Add only the selected tags
-    for (const tag of preferences) {
+    // Step 3: Add selected tags
+    for (const tag of selectedTags) {
       if (ALL_TAGS.includes(tag)) {
         await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
           tags: [tag]
