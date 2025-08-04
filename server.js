@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Allow POSTs from your site
+// Allow POSTs only from your site
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -16,11 +16,11 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// GHL API Settings
+// GHL API settings
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Tags you manage with this form
+// Tags used in your preferences center
 const ALL_TAGS = [
   'wants_service_notifications',
   'wants_promotions',
@@ -41,47 +41,28 @@ app.post('/update-preferences', async (req, res) => {
   console.log("✅ Selected tags:", selectedTags);
 
   try {
-    // Step 1: Look up the contact by email
-    // Step 1: Look up the contact by email (scoped to correct location)
-// Step 1: Look up contacts by email (filtering manually by location)
-console.log("🔍 Looking up contact by email...");
-const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
-  headers: { Authorization: `Bearer ${GHL_API_KEY}` },
-  params: { email }
-});
+    // TEMP: Hardcoded contact ID for safe testing
+    const contactId = 'Moz8op9wQvT8GnSMhHDd'; // << your real contact ID
+    console.log(`👤 [TEMP] Using hardcoded contact ID: ${contactId}`);
 
-const contacts = contactRes.data.contacts || [];
-const contact = contacts.find(c => c.locationId === 'zDhzBPMQLNkoGlJ9EExF');
-
-if (!contact || !contact.id) {
-  console.error("❌ Contact not found in correct location.");
-  return res.status(404).json({ error: 'No matching contact found in the correct location.' });
-}
-
-const contactId = contact.id;
-console.log(`👤 Found contact ID: ${contactId}`);
-
-
-    // Step 2: Remove all known preference tags
+    // Step 2: Remove all preference tags
     for (const tag of ALL_TAGS) {
       console.log(`🧹 Removing tag: ${tag}`);
       await axios.delete(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch(() => {}); // Ignore if it didn’t exist
+      }).catch(() => {}); // Ignore if not present
     }
 
-    // Step 3: Add selected tags
+    // Step 3: Add valid selected tags
     const validTags = selectedTags.filter(tag => ALL_TAGS.includes(tag));
-
-if (validTags.length > 0) {
-  console.log("➕ Adding tags:", validTags);
-  await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
-    tags: validTags
-  }, {
-    headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-  });
-}
-
+    if (validTags.length > 0) {
+      console.log("➕ Adding tags:", validTags);
+      await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
+        tags: validTags
+      }, {
+        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+      });
+    }
 
     console.log("✅ Preferences updated successfully.");
     return res.json({ success: true });
