@@ -48,11 +48,14 @@ app.post('/update-preferences', async (req, res) => {
       params: { email }
     });
 
-    const contact = contactRes.data.contacts?.[0];
-    if (!contact || !contact.id) {
-      console.error("❌ Contact not found in GHL.");
-      return res.status(404).json({ error: 'The contact id is invalid.' });
-    }
+    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
+  headers: { Authorization: `Bearer ${GHL_API_KEY}` },
+  params: {
+    email,
+    locationId: 'zDhzBPMQLNkoGlJ9EExF'
+  }
+});
+
 
     const contactId = contact.id;
     console.log(`👤 Found contact ID: ${contactId}`);
