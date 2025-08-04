@@ -1,65 +1,74 @@
 const express = require('express');
 const axios = require('axios');
-const cors = require('cors');
-require('dotenv').config();
-
+const bodyParser = require('body-parser');
 const app = express();
-app.use(express.json());
-app.use(cors());
+const PORT = process.env.PORT || 10000;
 
-const GHL_API_KEY = process.env.GHL_API_KEY;
-const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-const TAG_MAP = {
-  wants_service_notifications: 'Service Notifications (Necessary)',
-  wants_promotions: 'Promotions & Special Offers',
-  wants_general_updates: 'General Updates',
-  wants_surveys: 'Client Feedback & Surveys',
-  wants_yard_tips: 'Tips & Seasonal Yard Advice'
-};
+// GHL API settings
+const GHL_API_KEY = 'YOUR_GHL_API_KEY'; // replace with actual key
+const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
+
+// Tags we're managing
+const ALL_TAGS = [
+  'wants_service_notifications',
+  'wants_promotions',
+  'wants_general_updates',
+  'wants_surveys',
+  'wants_yard_tips'
+];
 
 app.post('/update-preferences', async (req, res) => {
-  const { email, ...formData } = req.body;
-  if (!email) return res.status(400).send('Missing email');
+  const { email, preferences = [] } = req.body;
+
+  console.log("Incoming form data:", JSON.stringify(req.body, null, 2));
+
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email address.' });
+  }
 
   try {
-    const contactRes = await axios.get(`${GHL_BASE_URL}/contacts/search`, {
+    // Step 1: Look up the contact in GHL
+    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` },
       params: { email }
     });
 
-    const contact = contactRes.data.contacts[0];
-    if (!contact) return res.status(404).send('Contact not found');
+    const contact = contactRes.data.contacts?.[0];
+    if (!contact || !contact.id) {
+      return res.status(404).json({ error: 'The contact id is invalid.' });
+    }
 
     const contactId = contact.id;
 
-    for (let tag of Object.keys(TAG_MAP)) {
-      await axios.delete(`${GHL_BASE_URL}/contacts/${contactId}/tags/${tag}`, {
+    // Step 2: Remove all existing preference tags
+    for (const tag of ALL_TAGS) {
+      await axios.delete(`${GHL_API_BASE}/contacts/${contactId}/tags/${tag}`, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch(() => {});
+      }).catch(() => {}); // Ignore if tag wasn't there
     }
 
-    for (let tag in formData) {
-      if (formData[tag] === 'on') {
-        await axios.post(`${GHL_BASE_URL}/contacts/${contactId}/tags`, {
-          tag
+    // Step 3: Add only the selected tags
+    for (const tag of preferences) {
+      if (ALL_TAGS.includes(tag)) {
+        await axios.post(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
+          tags: [tag]
         }, {
-          headers: {
-            Authorization: `Bearer ${GHL_API_KEY}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
         });
       }
     }
 
-    res.status(200).send('Preferences updated');
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).send('Something went wrong');
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error updating preferences:', error?.response?.data || error.message);
+    return res.status(500).json({ error: 'Failed to update preferences.' });
   }
 });
 
-app.get('/', (_, res) => res.send('Webhook running!'));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
