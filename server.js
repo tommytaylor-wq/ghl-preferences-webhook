@@ -43,19 +43,19 @@ app.post('/update-preferences', async (req, res) => {
   try {
     // Step 1: Look up the contact by email
     // Step 1: Look up the contact by email (scoped to correct location)
+// Step 1: Look up contacts by email (filtering manually by location)
 console.log("🔍 Looking up contact by email...");
 const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
   headers: { Authorization: `Bearer ${GHL_API_KEY}` },
-  params: {
-    email,
-    locationId: 'zDhzBPMQLNkoGlJ9EExF'
-  }
+  params: { email }
 });
 
-const contact = contactRes.data.contacts?.[0];
+const contacts = contactRes.data.contacts || [];
+const contact = contacts.find(c => c.locationId === 'zDhzBPMQLNkoGlJ9EExF');
+
 if (!contact || !contact.id) {
-  console.error("❌ Contact not found.");
-  return res.status(404).json({ error: 'The contact id is invalid.' });
+  console.error("❌ Contact not found in correct location.");
+  return res.status(404).json({ error: 'No matching contact found in the correct location.' });
 }
 
 const contactId = contact.id;
