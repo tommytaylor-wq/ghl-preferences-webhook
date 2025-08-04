@@ -20,7 +20,7 @@ app.use(bodyParser.json());
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Tags used in your preferences center
+// Tags managed by your preferences form
 const ALL_TAGS = [
   'wants_service_notifications',
   'wants_promotions',
@@ -31,9 +31,52 @@ const ALL_TAGS = [
 
 app.post('/update-preferences', async (req, res) => {
   const { email, cid, ...rawPrefs } = req.body;
-const contactId = cid;
+  const contactId = cid;
 
   console.log("📩 Incoming form data:", JSON.stringify(req.body, null, 2));
+
+  if (!email || !contactId) {
+    return res.status(400).json({ error: 'Missing email or contact ID.' });
+  }
+
+  const selectedTags = Object.keys(rawPrefs).filter(key => rawPrefs[key] === 'on');
+  console.log("✅ Selected tags:", selectedTags);
+
+  try {
+    // Step 1: Get the current tags on the contact
+    const existingRes = await axios.get(`${GHL_API_BASE}/contacts/${contactId}`, {
+      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+    });
+
+    const existingTags = existingRes.data.tags || [];
+    console.log("📎 Current tags on contact:", existingTags);
+
+    // Step 2: Remove only managed tags, keep others
+    const nonPreferenceTags = existingTags.filter(tag => !ALL_TAGS.includes(tag));
+    const validNewTags = selectedTags.filter(tag => ALL_TAGS.includes(tag));
+    const finalTags = [...new Set([...nonPreferenceTags, ...validNewTags])];
+
+    console.log("🔁 Final tags to apply:", finalTags);
+
+    // Step 3: Overwrite all tags with new combined set
+    await axios.put(`${GHL_API_BASE}/contacts/${contactId}/tags`, {
+      tags: finalTags
+    }, {
+      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+    });
+
+    console.log("✅ Preferences updated successfully.");
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error('💥 Error updating preferences:', error?.response?.data || error.message);
+    return res.status(500).json({ error: 'Failed to update preferences.' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
   if (!email) {
     return res.status(400).json({ error: 'Missing email address.' });
