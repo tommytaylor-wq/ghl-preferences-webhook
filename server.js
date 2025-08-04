@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Allow POSTs only from your frontend
+// Allow requests from your domain
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -16,11 +16,9 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// GHL API config
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Tags you manage in preferences
 const ALL_TAGS = [
   'wants_service_notifications',
   'wants_promotions',
@@ -37,39 +35,44 @@ app.post('/update-preferences', async (req, res) => {
   }
 
   const selectedTags = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
-  console.log("📩 Incoming:", { email, cid, selectedTags });
+  const tagsToRemove = ALL_TAGS.filter(tag => !selectedTags.includes(tag));
+  const tagsToAdd = selectedTags.filter(tag => ALL_TAGS.includes(tag));
+
+  console.log("📩 Form submission:");
+  console.log("Email:", email);
+  console.log("Contact ID:", cid);
+  console.log("Add Tags:", tagsToAdd);
+  console.log("Remove Tags:", tagsToRemove);
 
   try {
-    // 🔁 Delete only unselected managed tags
-    const unselected = ALL_TAGS.filter(tag => !selectedTags.includes(tag));
-    for (const tag of unselected) {
-      console.log(`🧹 Removing tag: ${tag}`);
-      await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tag}`, {
-        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      }).catch((err) => {
-        console.warn(`⚠️ Failed to delete tag '${tag}':`, err?.response?.data || err.message);
-      });
+    for (const tag of tagsToRemove) {
+      try {
+        await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tag}`, {
+          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+        });
+        console.log(`🧹 Removed tag: ${tag}`);
+      } catch (err) {
+        console.warn(`⚠️ Couldn't remove tag '${tag}':`, err.response?.data || err.message);
+      }
     }
 
-    // ➕ Add selected ones
-    if (selectedTags.length > 0) {
-      console.log("➕ Adding tags:", selectedTags);
+    if (tagsToAdd.length > 0) {
       await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
-        tags: selectedTags
+        tags: tagsToAdd
       }, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
       });
+      console.log("➕ Added tags:", tagsToAdd);
     }
 
-    console.log("✅ Preferences updated.");
-    res.json({ success: true });
+    return res.json({ success: true });
 
   } catch (err) {
-    console.error('💥 Update failed:', err?.response?.data || err.message);
-    res.status(500).json({ error: 'Update failed.' });
+    console.error("💥 Error:", err.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to update preferences.' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Preferences server running on port ${PORT}`);
 });
