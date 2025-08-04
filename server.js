@@ -6,7 +6,6 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Allow requests from your domain
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -38,11 +37,10 @@ app.post('/update-preferences', async (req, res) => {
   const tagsToRemove = ALL_TAGS.filter(tag => !selectedTags.includes(tag));
   const tagsToAdd = selectedTags.filter(tag => ALL_TAGS.includes(tag));
 
-  console.log("📩 Form submission:");
-  console.log("Email:", email);
-  console.log("Contact ID:", cid);
-  console.log("Add Tags:", tagsToAdd);
-  console.log("Remove Tags:", tagsToRemove);
+  console.log("📩 Incoming form submission");
+  console.log("👤 Contact ID:", cid);
+  console.log("✅ Tags to add:", tagsToAdd);
+  console.log("❌ Tags to remove:", tagsToRemove);
 
   try {
     for (const tag of tagsToRemove) {
@@ -52,7 +50,7 @@ app.post('/update-preferences', async (req, res) => {
         });
         console.log(`🧹 Removed tag: ${tag}`);
       } catch (err) {
-        console.warn(`⚠️ Couldn't remove tag '${tag}':`, err.response?.data || err.message);
+        console.warn(`⚠️ Could not remove tag '${tag}':`, err.response?.data || err.message);
       }
     }
 
@@ -65,14 +63,13 @@ app.post('/update-preferences', async (req, res) => {
       console.log("➕ Added tags:", tagsToAdd);
     }
 
-    return res.json({ success: true });
-
+    res.json({ success: true });
   } catch (err) {
-    console.error("💥 Error:", err.response?.data || err.message);
-    return res.status(500).json({ error: 'Failed to update preferences.' });
+    console.error("💥 Error updating preferences:", err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to update preferences.' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Preferences server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
