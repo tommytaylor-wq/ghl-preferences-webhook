@@ -42,13 +42,9 @@ app.post('/update-preferences', async (req, res) => {
 
   try {
     // Step 1: Look up the contact by email
-    console.log("🔍 Looking up contact by email...");
-    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
-      headers: { Authorization: `Bearer ${GHL_API_KEY}` },
-      params: { email }
-    });
-
-    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
+    // Step 1: Look up the contact by email (scoped to correct location)
+console.log("🔍 Looking up contact by email...");
+const contactRes = await axios.get(`${GHL_API_BASE}/contacts/`, {
   headers: { Authorization: `Bearer ${GHL_API_KEY}` },
   params: {
     email,
@@ -56,9 +52,15 @@ app.post('/update-preferences', async (req, res) => {
   }
 });
 
+const contact = contactRes.data.contacts?.[0];
+if (!contact || !contact.id) {
+  console.error("❌ Contact not found.");
+  return res.status(404).json({ error: 'The contact id is invalid.' });
+}
 
-    const contactId = contact.id;
-    console.log(`👤 Found contact ID: ${contactId}`);
+const contactId = contact.id;
+console.log(`👤 Found contact ID: ${contactId}`);
+
 
     // Step 2: Remove all known preference tags
     for (const tag of ALL_TAGS) {
