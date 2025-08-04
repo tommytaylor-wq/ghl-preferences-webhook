@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Allow POSTs only from your site
+// Allow POSTs from your frontend only
 app.use(cors({
   origin: 'https://tcdogwaste.com',
   methods: ['POST'],
@@ -16,11 +16,11 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// GHL API settings
+// GHL API config
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Tags managed by your preferences form
+// Tags managed by preferences center
 const ALL_TAGS = [
   'wants_service_notifications',
   'wants_promotions',
@@ -31,9 +31,47 @@ const ALL_TAGS = [
 
 app.post('/update-preferences', async (req, res) => {
   const { email, cid, ...rawPrefs } = req.body;
-  const contactId = cid;
 
-  console.log("📩 Incoming form data:", JSON.stringify(req.body, null, 2));
+  if (!email || !cid) {
+    return res.status(400).json({ error: 'Missing email or contact ID.' });
+  }
+
+  const selectedTags = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
+  console.log("📩 Incoming:", { email, cid, selectedTags });
+
+  try {
+    // Step 1: Remove unselected managed tags
+    for (const tag of ALL_TAGS) {
+      if (!selectedTags.includes(tag)) {
+        console.log(`🧹 Removing tag: ${tag}`);
+        await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tag}`, {
+          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+        }).catch(() => {});
+      }
+    }
+
+    // Step 2: Add selected tags
+    if (selectedTags.length > 0) {
+      console.log("➕ Adding:", selectedTags);
+      await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
+        tags: selectedTags
+      }, {
+        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+      });
+    }
+
+    console.log("✅ Preferences updated.");
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('💥 Update failed:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Update failed.' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Live on port ${PORT}`);
+});
 
   if (!email || !contactId) {
     return res.status(400).json({ error: 'Missing email or contact ID.' });
