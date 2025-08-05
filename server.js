@@ -20,7 +20,7 @@ const ALL_TAGS = [
   'wants_yard_tips'
 ];
 
-// Get all tags from GHL → return { tagName: tagId }
+// Fetch global tag name → tag ID mapping (for reference)
 async function getAllTagsMap() {
   const res = await axios.get(`${GHL_API_BASE}/tags`, {
     headers: { Authorization: `Bearer ${GHL_API_KEY}` }
@@ -50,24 +50,26 @@ app.post('/update-preferences', async (req, res) => {
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
     console.log("✅ Selected form fields:", selectedFields);
 
-    // Map form selections → tag IDs for removal
-    const selectedTagIds = selectedFields
-      .map(name => allTagsMap[name])
-      .filter(Boolean);
+    // Step 1: Get contact's current tags
+    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
+      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+    });
 
-    // All possible tag IDs from our list
-    const allPossibleTagIds = ALL_TAGS
-      .map(name => allTagsMap[name])
-      .filter(Boolean);
+    const currentTagIds = contactRes.data.contact.tags.map(t => t.id);
+    const currentTagNames = contactRes.data.contact.tags.map(t => t.name);
+    console.log("🏷 Current contact tags:", currentTagNames);
 
-    console.log("🆔 Selected tag IDs (for removal logic):", selectedTagIds);
-    console.log("🆔 All possible tag IDs:", allPossibleTagIds);
+    // Step 2: Determine tags to remove (unchecked but present on contact)
+    const tagsToRemove = ALL_TAGS
+      .filter(name => !selectedFields.includes(name) && currentTagNames.includes(name))
+      .map(name => {
+        const index = currentTagNames.indexOf(name);
+        return currentTagIds[index];
+      });
 
-    // Determine which tags to remove
-    const tagsToRemove = allPossibleTagIds.filter(id => !selectedTagIds.includes(id));
-    console.log("❌ Tags to remove (IDs):", tagsToRemove);
+    console.log("❌ Tags to remove (contact-specific IDs):", tagsToRemove);
 
-    // Remove tags by ID
+    // Step 3: Remove tags
     for (const tagId of tagsToRemove) {
       try {
         await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
@@ -79,10 +81,10 @@ app.post('/update-preferences', async (req, res) => {
       }
     }
 
-    // Add tags by NAME
+    // Step 4: Add tags by NAME
     if (selectedFields.length > 0) {
       await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
-        tags: selectedFields // send names here
+        tags: selectedFields // names, not IDs
       }, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
       });
