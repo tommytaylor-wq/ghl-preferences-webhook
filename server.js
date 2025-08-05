@@ -27,18 +27,6 @@ app.options('*', cors()); // Handle preflight requests
 
 app.use(bodyParser.json());
 
-// Fetch global tag name → tag ID mapping
-async function getAllTagsMap() {
-  const res = await axios.get(`${GHL_API_BASE}/tags`, {
-    headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-  });
-  const map = {};
-  res.data.tags.forEach(tag => {
-    map[tag.name] = tag.id;
-  });
-  return map;
-}
-
 app.post('/update-preferences', async (req, res) => {
   const { email, cid, ...rawPrefs } = req.body;
 
@@ -54,16 +42,20 @@ app.post('/update-preferences', async (req, res) => {
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
     console.log("✅ Selected form fields:", selectedFields);
 
-    // Step 1: Get all tags in account
-    const allTagsMap = await getAllTagsMap();
-    console.log("📂 Tags from GHL:", allTagsMap);
+    // Step 1: Get contact's current tags
+    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
+      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+    });
 
-    // Step 2: Remove all preference tags from this contact
-    const allPreferenceTagIds = ALL_TAGS
-      .map(name => allTagsMap[name])
-      .filter(Boolean);
+    // Step 2: Filter to preference tags only
+    const tagsToRemove = contactRes.data.contact.tags
+      .filter(tag => ALL_TAGS.includes(tag.name))
+      .map(tag => tag.id);
 
-    for (const tagId of allPreferenceTagIds) {
+    console.log("❌ Tags to remove (contact-specific IDs):", tagsToRemove);
+
+    // Step 3: Remove tags
+    for (const tagId of tagsToRemove) {
       try {
         await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
           headers: { Authorization: `Bearer ${GHL_API_KEY}` }
@@ -74,7 +66,7 @@ app.post('/update-preferences', async (req, res) => {
       }
     }
 
-    // Step 3: Add selected tags by NAME
+    // Step 4: Add selected tags by NAME
     if (selectedFields.length > 0) {
       await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
         tags: selectedFields
