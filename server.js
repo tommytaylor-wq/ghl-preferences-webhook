@@ -20,7 +20,7 @@ const ALL_TAGS = [
   'wants_yard_tips'
 ];
 
-// Fetch global tag name → tag ID mapping (for reference)
+// Fetch global tag name → tag ID mapping
 async function getAllTagsMap() {
   const res = await axios.get(`${GHL_API_BASE}/tags`, {
     headers: { Authorization: `Bearer ${GHL_API_KEY}` }
@@ -43,34 +43,36 @@ app.post('/update-preferences', async (req, res) => {
     console.log(`📩 Request for ${email} (CID: ${cid})`);
     console.log("📝 Raw preferences from form:", rawPrefs);
 
-    const allTagsMap = await getAllTagsMap();
-    console.log("📂 Tags from GHL:", allTagsMap);
-
     // Selected checkboxes from form
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
     console.log("✅ Selected form fields:", selectedFields);
 
-    // Step 1: Get contact's current tags
+    // Step 1: Get all tags in account (name → ID)
+    const allTagsMap = await getAllTagsMap();
+    console.log("📂 Tags from GHL:", allTagsMap);
+
+    // Step 2: Get contact's current tags (IDs only)
     const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` }
     });
+    const contactTagIds = contactRes.data.contact.tags.map(t => t.id);
 
-    const currentTagIds = contactRes.data.contact.tags.map(t => t.id);
-    const currentTagNames = contactRes.data.contact.tags.map(t => t.name);
+    // Step 3: Convert contact tag IDs → names
+    const idToNameMap = Object.fromEntries(
+      Object.entries(allTagsMap).map(([name, id]) => [id, name])
+    );
+    const currentTagNames = contactTagIds.map(id => idToNameMap[id]).filter(Boolean);
     console.log("🏷 Current contact tags:", currentTagNames);
 
-    // Step 2: Determine tags to remove (unchecked but present on contact)
-    const tagsToRemove = ALL_TAGS
+    // Step 4: Determine tags to remove (unchecked but present)
+    const tagsToRemoveIds = ALL_TAGS
       .filter(name => !selectedFields.includes(name) && currentTagNames.includes(name))
-      .map(name => {
-        const index = currentTagNames.indexOf(name);
-        return currentTagIds[index];
-      });
+      .map(name => allTagsMap[name]);
 
-    console.log("❌ Tags to remove (contact-specific IDs):", tagsToRemove);
+    console.log("❌ Tags to remove (IDs):", tagsToRemoveIds);
 
-    // Step 3: Remove tags
-    for (const tagId of tagsToRemove) {
+    // Step 5: Remove tags by ID
+    for (const tagId of tagsToRemoveIds) {
       try {
         await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
           headers: { Authorization: `Bearer ${GHL_API_KEY}` }
@@ -81,7 +83,7 @@ app.post('/update-preferences', async (req, res) => {
       }
     }
 
-    // Step 4: Add tags by NAME
+    // Step 6: Add tags by NAME
     if (selectedFields.length > 0) {
       await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
         tags: selectedFields // names, not IDs
