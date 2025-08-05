@@ -50,7 +50,7 @@ app.post('/update-preferences', async (req, res) => {
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
     console.log("✅ Selected form fields:", selectedFields);
 
-    // Map form selections → tag IDs in GHL
+    // Map form selections → tag IDs for removal
     const selectedTagIds = selectedFields
       .map(name => allTagsMap[name])
       .filter(Boolean);
@@ -60,14 +60,14 @@ app.post('/update-preferences', async (req, res) => {
       .map(name => allTagsMap[name])
       .filter(Boolean);
 
-    console.log("🆔 Selected tag IDs:", selectedTagIds);
+    console.log("🆔 Selected tag IDs (for removal logic):", selectedTagIds);
     console.log("🆔 All possible tag IDs:", allPossibleTagIds);
 
     // Determine which tags to remove
     const tagsToRemove = allPossibleTagIds.filter(id => !selectedTagIds.includes(id));
-    console.log("❌ Tags to remove:", tagsToRemove);
+    console.log("❌ Tags to remove (IDs):", tagsToRemove);
 
-    // Remove tags
+    // Remove tags by ID
     for (const tagId of tagsToRemove) {
       try {
         await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
@@ -79,14 +79,14 @@ app.post('/update-preferences', async (req, res) => {
       }
     }
 
-    // Add tags
-    if (selectedTagIds.length > 0) {
+    // Add tags by NAME
+    if (selectedFields.length > 0) {
       await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
-        tags: selectedTagIds
+        tags: selectedFields // send names here
       }, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
       });
-      console.log(`➕ Added tag IDs: ${selectedTagIds}`);
+      console.log(`➕ Added tag names: ${selectedFields}`);
     }
 
     res.json({ success: true });
