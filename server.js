@@ -50,9 +50,12 @@ app.post('/update-preferences', async (req, res) => {
 
 
     // Step 2: Filter to preference tags only
-    const tagsToRemove = contactRes.data.contact.tags
-      .filter(tag => ALL_TAGS.includes(tag.name))
-      .map(tag => tag.id);
+    const currentTagNames = contactRes.data.contact.tags || [];
+const tagsToRemove = currentTagNames
+  .filter(name => ALL_TAGS.includes(name))
+  .map(name => allTagsMap[name]) // get ID from global tags map
+  .filter(Boolean);
+
 
     console.log("❌ Tags to remove (contact-specific IDs):", tagsToRemove);
 
