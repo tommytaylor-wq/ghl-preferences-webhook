@@ -46,6 +46,8 @@ app.post('/update-preferences', async (req, res) => {
     const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` }
     });
+    console.log("🔍 Full contact response:", JSON.stringify(contactRes.data, null, 2));
+
 
     // Step 2: Filter to preference tags only
     const tagsToRemove = contactRes.data.contact.tags
