@@ -54,32 +54,16 @@ app.post('/update-preferences', async (req, res) => {
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
     console.log("✅ Selected form fields:", selectedFields);
 
-    // Step 1: Get all tags in account (name → ID)
+    // Step 1: Get all tags in account
     const allTagsMap = await getAllTagsMap();
     console.log("📂 Tags from GHL:", allTagsMap);
 
-    // Step 2: Get contact's current tags (IDs only)
-    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
-      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-    });
-    const contactTagIds = contactRes.data.contact.tags.map(t => t.id);
+    // Step 2: Remove all preference tags from this contact
+    const allPreferenceTagIds = ALL_TAGS
+      .map(name => allTagsMap[name])
+      .filter(Boolean);
 
-    // Step 3: Convert contact tag IDs → names
-    const idToNameMap = Object.fromEntries(
-      Object.entries(allTagsMap).map(([name, id]) => [id, name])
-    );
-    const currentTagNames = contactTagIds.map(id => idToNameMap[id]).filter(Boolean);
-    console.log("🏷 Current contact tags:", currentTagNames);
-
-    // Step 4: Determine tags to remove (unchecked but present)
-    const tagsToRemoveIds = ALL_TAGS
-      .filter(name => !selectedFields.includes(name) && currentTagNames.includes(name))
-      .map(name => allTagsMap[name]);
-
-    console.log("❌ Tags to remove (IDs):", tagsToRemoveIds);
-
-    // Step 5: Remove tags by ID
-    for (const tagId of tagsToRemoveIds) {
+    for (const tagId of allPreferenceTagIds) {
       try {
         await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
           headers: { Authorization: `Bearer ${GHL_API_KEY}` }
@@ -90,10 +74,10 @@ app.post('/update-preferences', async (req, res) => {
       }
     }
 
-    // Step 6: Add tags by NAME
+    // Step 3: Add selected tags by NAME
     if (selectedFields.length > 0) {
       await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
-        tags: selectedFields // names, not IDs
+        tags: selectedFields
       }, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
       });
