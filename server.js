@@ -6,9 +6,6 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(cors({ origin: '*', methods: ['POST'] }));
-app.use(bodyParser.json());
-
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
@@ -19,6 +16,16 @@ const ALL_TAGS = [
   'wants_surveys',
   'wants_yard_tips'
 ];
+
+// --- CORS FIX ---
+app.use(cors({
+  origin: '*', // Change to your domain for security
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+}));
+app.options('*', cors()); // Handle preflight requests
+
+app.use(bodyParser.json());
 
 // Fetch global tag name → tag ID mapping
 async function getAllTagsMap() {
