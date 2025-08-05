@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
 
-// Map form field names to tag names in GHL
+// Map form field names → actual GHL tag names
 const TAG_NAME_MAP = {
   wants_service_notifications: "Service Notifications",
   wants_promotions: "Promotions & Special Offers",
@@ -21,7 +21,7 @@ const TAG_NAME_MAP = {
   wants_yard_tips: "Yard Tips"
 };
 
-// Fetch all GHL tags and return name → id map
+// Get all tags from GHL and return { name: id } mapping
 async function getAllTagsMap() {
   const res = await axios.get(`${GHL_API_BASE}/tags`, {
     headers: { Authorization: `Bearer ${GHL_API_KEY}` }
@@ -41,23 +41,35 @@ app.post('/update-preferences', async (req, res) => {
   }
 
   try {
+    console.log(`📩 Incoming request for ${email} (CID: ${cid})`);
+
+    // Get all available tags from GHL
     const allTagsMap = await getAllTagsMap();
 
-    // Determine which tags to add/remove
+    // Figure out which tags the user selected
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
-    const selectedTagIds = selectedFields.map(f => allTagsMap[TAG_NAME_MAP[f]]).filter(Boolean);
+    const selectedTagIds = selectedFields
+      .map(field => allTagsMap[TAG_NAME_MAP[field]])
+      .filter(Boolean);
 
+    // All possible tag IDs from our map
     const allPossibleTagIds = Object.values(TAG_NAME_MAP)
       .map(name => allTagsMap[name])
       .filter(Boolean);
 
+    // Tags to remove = all possible tags minus selected ones
     const tagsToRemove = allPossibleTagIds.filter(id => !selectedTagIds.includes(id));
 
     // Remove unwanted tags
     for (const tagId of tagsToRemove) {
-      await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
-        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      });
+      try {
+        await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
+          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+        });
+        console.log(`🧹 Removed tag ID: ${tagId}`);
+      } catch (err) {
+        console.warn(`⚠️ Could not remove tag ${tagId}:`, err.response?.data || err.message);
+      }
     }
 
     // Add selected tags
@@ -67,45 +79,7 @@ app.post('/update-preferences', async (req, res) => {
       }, {
         headers: { Authorization: `Bearer ${GHL_API_KEY}` }
       });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error("💥 Error updating preferences:", err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to update preferences.' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
-  const tagsToRemove = ALL_TAGS.filter(tag => !selectedTags.includes(tag));
-  const tagsToAdd = selectedTags.filter(tag => ALL_TAGS.includes(tag));
-
-  console.log("📩 Incoming form submission");
-  console.log("👤 Contact ID:", cid);
-  console.log("✅ Tags to add:", tagsToAdd);
-  console.log("❌ Tags to remove:", tagsToRemove);
-
-  try {
-    for (const tag of tagsToRemove) {
-      try {
-        await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tag}`, {
-          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-        });
-        console.log(`🧹 Removed tag: ${tag}`);
-      } catch (err) {
-        console.warn(`⚠️ Could not remove tag '${tag}':`, err.response?.data || err.message);
-      }
-    }
-
-    if (tagsToAdd.length > 0) {
-      await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
-        tags: tagsToAdd
-      }, {
-        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      });
-      console.log("➕ Added tags:", tagsToAdd);
+      console.log(`➕ Added tags: ${selectedTagIds.join(', ')}`);
     }
 
     res.json({ success: true });
