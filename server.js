@@ -75,3 +75,23 @@ app.post('/update-preferences', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+app.get('/get-preferences', async (req, res) => {
+  const { cid } = req.query;
+  if (!cid) return res.status(400).json({ error: 'Missing contact ID' });
+
+  try {
+    const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
+      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+    });
+
+    const currentTags = contactRes.data.contact.tags || [];
+    const preferenceTags = currentTags.filter(tag => ALL_TAGS.includes(tag));
+
+    res.json({ tags: preferenceTags });
+  } catch (err) {
+    console.error("💥 Error fetching preferences:", err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch preferences' });
+  }
+});
+
