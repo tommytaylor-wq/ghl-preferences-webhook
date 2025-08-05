@@ -20,24 +20,12 @@ const ALL_TAGS = [
 // --- CORS FIX ---
 app.use(cors({
   origin: '*', // Change to your domain for security
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'OPTIONS', 'PUT'],
   allowedHeaders: ['Content-Type']
 }));
 app.options('*', cors()); // Handle preflight requests
 
 app.use(bodyParser.json());
-
-// Utility: fetch global tag name → tag ID mapping
-async function getAllTagsMap() {
-  const res = await axios.get(`${GHL_API_BASE}/tags`, {
-    headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-  });
-  const map = {};
-  res.data.tags.forEach(tag => {
-    map[tag.name] = tag.id;
-  });
-  return map;
-}
 
 app.post('/update-preferences', async (req, res) => {
   const { email, cid, ...rawPrefs } = req.body;
@@ -50,49 +38,33 @@ app.post('/update-preferences', async (req, res) => {
     console.log(`📩 Request for ${email} (CID: ${cid})`);
     console.log("📝 Raw preferences from form:", rawPrefs);
 
-    // Selected checkboxes from form
+    // Selected checkboxes from form (preferences to keep)
     const selectedFields = Object.keys(rawPrefs).filter(k => rawPrefs[k] === 'on');
-    console.log("✅ Selected form fields:", selectedFields);
+    console.log("✅ Selected preference tags:", selectedFields);
 
-    // Step 1: Get all tags in account
-    const allTagsMap = await getAllTagsMap();
-
-    // Step 2: Get contact's current tags (names)
+    // Step 1: Get current contact tags
     const contactRes = await axios.get(`${GHL_API_BASE}/contacts/${cid}`, {
       headers: { Authorization: `Bearer ${GHL_API_KEY}` }
     });
-    const currentTagNames = contactRes.data.contact.tags || [];
-    console.log("🏷 Current contact tag names:", currentTagNames);
+    const currentTags = contactRes.data.contact.tags || [];
+    console.log("🏷 Current contact tags:", currentTags);
 
-    // Step 3: Map current tag names → IDs to remove (only for our preference tags)
-    const tagsToRemove = currentTagNames
-      .filter(name => ALL_TAGS.includes(name))
-      .map(name => allTagsMap[name]) // translate to IDs from global map
-      .filter(Boolean);
-    console.log("❌ Tags to remove (IDs):", tagsToRemove);
+    // Step 2: Keep all tags that are NOT in the preferences list
+    const preservedTags = currentTags.filter(tag => !ALL_TAGS.includes(tag));
+    console.log("🔒 Preserved non-preference tags:", preservedTags);
 
-    // Step 4: Remove tags
-    for (const tagId of tagsToRemove) {
-      try {
-        await axios.delete(`${GHL_API_BASE}/contacts/${cid}/tags/${tagId}`, {
-          headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-        });
-        console.log(`🧹 Removed tag ID: ${tagId}`);
-      } catch (err) {
-        console.warn(`⚠️ Could not remove tag ID ${tagId}:`, err.response?.data || err.message);
-      }
-    }
+    // Step 3: Merge preserved + selected preference tags
+    const finalTags = [...preservedTags, ...selectedFields];
+    console.log("📦 Final tags to save:", finalTags);
 
-    // Step 5: Add selected tags by NAME
-    if (selectedFields.length > 0) {
-      await axios.post(`${GHL_API_BASE}/contacts/${cid}/tags`, {
-        tags: selectedFields
-      }, {
-        headers: { Authorization: `Bearer ${GHL_API_KEY}` }
-      });
-      console.log(`➕ Added tag names: ${selectedFields}`);
-    }
+    // Step 4: Update contact with full tag list (one API call)
+    await axios.put(`${GHL_API_BASE}/contacts/${cid}`, {
+      tags: finalTags
+    }, {
+      headers: { Authorization: `Bearer ${GHL_API_KEY}` }
+    });
 
+    console.log(`✅ Preferences updated successfully for ${email}`);
     res.json({ success: true });
   } catch (err) {
     console.error("💥 Error updating preferences:", err.response?.data || err.message);
